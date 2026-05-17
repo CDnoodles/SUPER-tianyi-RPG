@@ -5,6 +5,10 @@
 
     var savePoint = "";
 
+    var currentSlot = 1;
+    var totalSlots = 3;
+    var saveMetadata = {}; // { slot: { text: first line of save, time: timestamp } }
+
     let savedTheme;
     let globalTagTheme;
 
@@ -352,11 +356,62 @@
         return null;
     }
 
+    function getSlotKey(slot) {
+        return 'save-state-' + slot;
+    }
+    function getMetaKey(slot) {
+        return 'save-meta-' + slot;
+    }
+
+    // Loads metadata for all slots from localStorage
+    function loadAllMetadata() {
+        for (var s = 1; s <= totalSlots; s++) {
+            try {
+                var meta = window.localStorage.getItem(getMetaKey(s));
+                if (meta) {
+                    saveMetadata[s] = JSON.parse(meta);
+                }
+            } catch (e) { /* ignore */ }
+        }
+    }
+
+    // Refreshes slot button styles to show which slots have saves
+    function refreshSlotButtons() {
+        for (var s = 1; s <= totalSlots; s++) {
+            var btn = document.querySelector('.slot-btn[data-slot="' + s + '"]');
+            if (btn) {
+                if (saveMetadata[s]) {
+                    btn.classList.add('has-save');
+                } else {
+                    btn.classList.remove('has-save');
+                }
+                if (s === currentSlot) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            }
+        }
+    }
+
     // Loads save state if exists in the browser memory
     function loadSavePoint() {
 
         try {
-            let savedState = window.localStorage.getItem('save-state');
+            // Try to load last-used slot from localStorage
+            var lastSlot = window.localStorage.getItem('save-last-slot');
+            if (lastSlot) currentSlot = parseInt(lastSlot);
+        } catch (e) { /* ignore */ }
+
+        loadAllMetadata();
+        refreshSlotButtons();
+
+        // Auto-load slot 1 if it exists (backward compat: also check old key)
+        try {
+            var savedState = window.localStorage.getItem(getSlotKey(currentSlot));
+            if (!savedState) {
+                savedState = window.localStorage.getItem('save-state');
+            }
             if (savedState) {
                 story.state.LoadJson(savedState);
                 return true;
@@ -390,6 +445,26 @@
     // Used to hook up the functionality for global functionality buttons
     function setupButtons(hasSave) {
 
+        var reloadEl = document.getElementById("reload");
+
+        // Slot selector buttons
+        var slotBtns = document.querySelectorAll(".slot-btn");
+        for (var i = 0; i < slotBtns.length; i++) {
+            slotBtns[i].addEventListener("click", function(event) {
+                currentSlot = parseInt(this.getAttribute("data-slot"));
+                try {
+                    window.localStorage.setItem('save-last-slot', currentSlot);
+                } catch (e) { /* ignore */ }
+                refreshSlotButtons();
+                // Enable/disable load button based on whether this slot has a save
+                if (saveMetadata[currentSlot]) {
+                    reloadEl.removeAttribute("disabled");
+                } else {
+                    reloadEl.setAttribute("disabled", "disabled");
+                }
+            });
+        }
+
         let rewindEl = document.getElementById("rewind");
         if (rewindEl) rewindEl.addEventListener("click", function(event) {
             removeAll("p");
@@ -401,16 +476,21 @@
         let saveEl = document.getElementById("save");
         if (saveEl) saveEl.addEventListener("click", function(event) {
             try {
-                window.localStorage.setItem('save-state', savePoint);
-                document.getElementById("reload").removeAttribute("disabled");
+                window.localStorage.setItem(getSlotKey(currentSlot), savePoint);
+                // Save metadata (first line snippet + timestamp)
+                var meta = {
+                    time: new Date().toLocaleString()
+                };
+                window.localStorage.setItem(getMetaKey(currentSlot), JSON.stringify(meta));
+                saveMetadata[currentSlot] = meta;
+                reloadEl.removeAttribute("disabled");
+                refreshSlotButtons();
                 window.localStorage.setItem('theme', document.body.classList.contains("dark") ? "dark" : "");
             } catch (e) {
                 console.warn("Couldn't save state");
             }
-
         });
 
-        let reloadEl = document.getElementById("reload");
         if (!hasSave) {
             reloadEl.setAttribute("disabled", "disabled");
         }
@@ -421,7 +501,7 @@
             removeAll("p");
             removeAll("img");
             try {
-                let savedState = window.localStorage.getItem('save-state');
+                var savedState = window.localStorage.getItem(getSlotKey(currentSlot));
                 if (savedState) story.state.LoadJson(savedState);
             } catch (e) {
                 console.debug("Couldn't load save state");

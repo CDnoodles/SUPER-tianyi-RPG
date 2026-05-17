@@ -236,6 +236,32 @@ img {
     color: #ccc;
 }
 
+#slot-selector {
+    margin: 0 2px;
+}
+
+.slot-btn {
+    cursor: pointer;
+    padding: 0 3px;
+    color: #999;
+}
+
+.slot-btn.active {
+    color: #b97c2c;
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.slot-btn.has-save {
+    color: #4a4;
+}
+
+.slot-btn.active.has-save {
+    color: #b97c2c;
+    font-weight: bold;
+    text-decoration: underline;
+}
+
 #controls>*:not(:last-child):after {
     content: " | ";
 }
@@ -296,6 +322,18 @@ body.dark {
 
 .dark #controls [disabled] {
     color: #444;
+}
+
+.dark .slot-btn {
+    color: #666;
+}
+
+.dark .slot-btn.active {
+    color: #cc8f1a;
+}
+
+.dark .slot-btn.has-save {
+    color: #5c5;
 }
 
 .dark .end {
